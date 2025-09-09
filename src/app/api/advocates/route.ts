@@ -13,7 +13,6 @@ export async function GET(): Promise<Response> {
     const response: AdvocatesResponse = { data };
     return Response.json(response);
   } catch (error) {
-    console.error("Error fetching advocates:", error);
     return Response.json(
       { error: "Failed to fetch advocates" },
       { status: 500 }
