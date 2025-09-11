@@ -9,11 +9,13 @@
     "lint": "next lint",
     "generate": "drizzle-kit generate",
     "migrate:up": "node ./src/db/migrate.js",
-    "seed": "node --loader esbuild-register/loader -r esbuild-register ./src/db/seed/index.ts"
+    "seed": "tsx ./src/db/seed/index.ts",
+    "db:reset": "npm run migrate:up && npm run seed",
+    "db:setup": "npm run generate && npm run db:reset"
   },
   "dependencies": {
+    "dotenv": "^17.2.2",
     "drizzle-orm": "^0.44.5",
-    "drizzle-zod": "^0.8.3",
     "next": "^14.2.19",
     "postgres": "^3.4.4",
     "react": "^18.3.1",
@@ -29,6 +31,7 @@
     "eslint-config-next": "14.2.5",
     "postcss": "^8.4.40",
     "tailwindcss": "^3.4.7",
+    "tsx": "^4.7.0",
     "typescript": "^5.5.4"
   }
 }

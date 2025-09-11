@@ -40,10 +40,10 @@ const randomSpecialty = () => {
 const advocateData = [
   {
     id: 1,
-    firstName: "John",
-    lastName: "Doe",
-    city: "New York",
-    degree: "MD",
+    firstName: "Benjamin",
+    lastName: "Clark",
+    city: "Seattle",
+    degree: "MA",
     specialties: specialties.slice(...randomSpecialty()),
     yearsOfExperience: 10,
     phoneNumber: 5551234567,
