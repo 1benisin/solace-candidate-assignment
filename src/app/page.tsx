@@ -1,74 +1,87 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Advocate, AdvocatesResponse } from "../types/advocate";
+import { Advocate, AdvocatesResponse, PaginationInfo } from "../types/advocate";
+import { formatPhoneNumber } from "../utils/phone";
 
 export default function Home() {
   const [advocates, setAdvocates] = useState<Advocate[]>([]);
-  const [filteredAdvocates, setFilteredAdvocates] = useState<Advocate[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [expandedAdvocateId, setExpandedAdvocateId] = useState<number | null>(
+    null
+  );
 
-  useEffect(() => {
-    const fetchAdvocates = async () => {
+  const fetchAdvocates = useCallback(
+    async (
+      search: string = "",
+      page: number = 1,
+      isInitialLoad: boolean = false
+    ) => {
       try {
-        setLoading(true);
+        // Only show full loading screen on initial load, not during search
+        if (isInitialLoad) {
+          setLoading(true);
+        }
         setError(null);
 
-        const response = await fetch("/api/advocates");
+        const params = new URLSearchParams({
+          search,
+          page: page.toString(),
+          limit: "20",
+        });
+
+        const response = await fetch(`/api/advocates?${params}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const jsonResponse: AdvocatesResponse = await response.json();
+        const jsonResponse: AdvocatesResponse<Advocate> = await response.json();
         setAdvocates(jsonResponse.data);
-        setFilteredAdvocates(jsonResponse.data);
+        if (jsonResponse.pagination) {
+          setPagination(jsonResponse.pagination);
+        }
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to fetch advocates"
         );
       } finally {
-        setLoading(false);
+        if (isInitialLoad) {
+          setLoading(false);
+        }
       }
-    };
+    },
+    []
+  );
 
-    fetchAdvocates();
-  }, []);
+  useEffect(() => {
+    fetchAdvocates("", 1, true);
+  }, [fetchAdvocates]);
 
   // Debounced search function
   const debouncedSearch = useCallback(
-    (searchValue: string) => {
+    async (searchValue: string) => {
       setIsSearching(true);
 
       // Sanitize input to prevent XSS (script injection)
       const sanitizedValue = searchValue.replace(/[<>]/g, "");
 
-      const filtered = advocates.filter((advocate) => {
-        const searchLower = sanitizedValue.toLowerCase();
-        return (
-          advocate.firstName.toLowerCase().includes(searchLower) ||
-          advocate.lastName.toLowerCase().includes(searchLower) ||
-          advocate.city.toLowerCase().includes(searchLower) ||
-          advocate.degree.toLowerCase().includes(searchLower) ||
-          advocate.specialties.some((specialty) =>
-            specialty.toLowerCase().includes(searchLower)
-          ) ||
-          advocate.yearsOfExperience.toString().includes(sanitizedValue)
-        );
-      });
-
-      setFilteredAdvocates(filtered);
+      // Reset to first page when searching
+      setCurrentPage(1);
+      await fetchAdvocates(sanitizedValue, 1);
       setIsSearching(false);
     },
-    [advocates]
+    [fetchAdvocates]
   );
 
   // Debounce effect
   useEffect(() => {
-    const timer = setTimeout(() => {
-      debouncedSearch(searchTerm);
+    const timer = setTimeout(async () => {
+      await debouncedSearch(searchTerm);
     }, 300);
 
     return () => clearTimeout(timer);
@@ -81,7 +94,21 @@ export default function Home() {
 
   const handleResetSearch = () => {
     setSearchTerm("");
-    setFilteredAdvocates(advocates);
+    setCurrentPage(1);
+    fetchAdvocates("", 1, false);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    fetchAdvocates(searchTerm, page, false);
+  };
+
+  const handleSpecialtiesExpand = (advocateId: number) => {
+    // If clicking on already expanded advocate, collapse it
+    // Otherwise, expand the clicked advocate (this also collapses any other expanded one)
+    setExpandedAdvocateId(
+      expandedAdvocateId === advocateId ? null : advocateId
+    );
   };
 
   if (loading) {
@@ -161,7 +188,7 @@ export default function Home() {
         </div>
       </div>
 
-      {filteredAdvocates.length === 0 ? (
+      {advocates.length === 0 ? (
         <div className="text-center py-12">
           <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <svg
@@ -236,7 +263,7 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredAdvocates.map((advocate) => (
+                {advocates.map((advocate) => (
                   <tr
                     key={advocate.id}
                     className="hover:bg-gray-50 transition-colors"
@@ -262,19 +289,40 @@ export default function Home() {
                     </td>
                     <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 hidden lg:table-cell">
                       <div className="flex flex-wrap gap-1">
-                        {advocate.specialties
-                          .slice(0, 2)
-                          .map((specialty, index) => (
-                            <span
-                              key={index}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                            >
-                              {specialty}
-                            </span>
-                          ))}
+                        {(expandedAdvocateId === advocate.id
+                          ? advocate.specialties
+                          : advocate.specialties.slice(0, 2)
+                        ).map((specialty, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                          >
+                            {specialty}
+                          </span>
+                        ))}
                         {advocate.specialties.length > 2 && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                            +{advocate.specialties.length - 2} more
+                          <span
+                            onClick={() => handleSpecialtiesExpand(advocate.id)}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 cursor-pointer hover:bg-gray-200 transition-colors"
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleSpecialtiesExpand(advocate.id);
+                              }
+                            }}
+                            aria-label={
+                              expandedAdvocateId === advocate.id
+                                ? "Show fewer specialties"
+                                : `Show ${
+                                    advocate.specialties.length - 2
+                                  } more specialties`
+                            }
+                          >
+                            {expandedAdvocateId === advocate.id
+                              ? "Show less"
+                              : `+${advocate.specialties.length - 2} more`}
                           </span>
                         )}
                       </div>
@@ -286,9 +334,11 @@ export default function Home() {
                       <a
                         href={`tel:${advocate.phoneNumber}`}
                         className="text-blue-600 hover:text-blue-800 hover:underline"
-                        aria-label={`Call ${advocate.firstName} ${advocate.lastName} at ${advocate.phoneNumber}`}
+                        aria-label={`Call ${advocate.firstName} ${
+                          advocate.lastName
+                        } at ${formatPhoneNumber(advocate.phoneNumber)}`}
                       >
-                        {advocate.phoneNumber}
+                        {formatPhoneNumber(advocate.phoneNumber)}
                       </a>
                     </td>
                   </tr>
@@ -297,10 +347,47 @@ export default function Home() {
             </table>
           </div>
           <div className="bg-gray-50 px-4 sm:px-6 py-3 border-t border-gray-200">
-            <p className="text-sm text-gray-600">
-              Showing {filteredAdvocates.length} of {advocates.length} advocates
-              {searchTerm && ` matching "${searchTerm}"`}
-            </p>
+            <div className="flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
+              <p className="text-sm text-gray-600">
+                {pagination ? (
+                  <>
+                    Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+                    {Math.min(
+                      pagination.page * pagination.limit,
+                      pagination.total
+                    )}{" "}
+                    of {pagination.total} advocates
+                    {searchTerm && ` matching "${searchTerm}"`}
+                  </>
+                ) : (
+                  `Showing ${advocates.length} advocates`
+                )}
+              </p>
+
+              {pagination && pagination.totalPages > 1 && (
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={!pagination.hasPrev}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+
+                  <span className="text-sm text-gray-600">
+                    Page {pagination.page} of {pagination.totalPages}
+                  </span>
+
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={!pagination.hasNext}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
