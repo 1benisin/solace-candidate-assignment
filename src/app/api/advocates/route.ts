@@ -1,6 +1,5 @@
 import db from "../../../db";
 import { advocates } from "../../../db/schema";
-import { advocateData } from "../../../db/seed/advocates";
 import {
   advocateResponseSchema,
   type Advocate,
