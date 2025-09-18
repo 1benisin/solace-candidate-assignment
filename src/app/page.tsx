@@ -15,12 +15,18 @@ export default function Home() {
   const [expandedAdvocateId, setExpandedAdvocateId] = useState<number | null>(
     null
   );
+  const [sortBy, setSortBy] = useState<"firstName" | "lastName" | "city">(
+    "lastName"
+  );
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   const fetchAdvocates = useCallback(
     async (
       search: string = "",
       page: number = 1,
-      isInitialLoad: boolean = false
+      isInitialLoad: boolean = false,
+      sortByParam: "firstName" | "lastName" | "city" = "lastName",
+      sortOrderParam: "asc" | "desc" = "asc"
     ) => {
       try {
         // Only show full loading screen on initial load, not during search
@@ -33,6 +39,8 @@ export default function Home() {
           search,
           page: page.toString(),
           limit: "20",
+          sortBy: sortByParam,
+          sortOrder: sortOrderParam,
         });
 
         const response = await fetch(`/api/advocates?${params}`);
@@ -59,8 +67,8 @@ export default function Home() {
   );
 
   useEffect(() => {
-    fetchAdvocates("", 1, true);
-  }, [fetchAdvocates]);
+    fetchAdvocates("", 1, true, sortBy, sortOrder);
+  }, [fetchAdvocates, sortBy, sortOrder]);
 
   // Debounced search function
   const debouncedSearch = useCallback(
@@ -72,10 +80,10 @@ export default function Home() {
 
       // Reset to first page when searching
       setCurrentPage(1);
-      await fetchAdvocates(sanitizedValue, 1);
+      await fetchAdvocates(sanitizedValue, 1, false, sortBy, sortOrder);
       setIsSearching(false);
     },
-    [fetchAdvocates]
+    [fetchAdvocates, sortBy, sortOrder]
   );
 
   // Debounce effect
@@ -95,12 +103,12 @@ export default function Home() {
   const handleResetSearch = () => {
     setSearchTerm("");
     setCurrentPage(1);
-    fetchAdvocates("", 1, false);
+    fetchAdvocates("", 1, false, sortBy, sortOrder);
   };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    fetchAdvocates(searchTerm, page, false);
+    fetchAdvocates(searchTerm, page, false, sortBy, sortOrder);
   };
 
   const handleSpecialtiesExpand = (advocateId: number) => {
@@ -109,6 +117,18 @@ export default function Home() {
     setExpandedAdvocateId(
       expandedAdvocateId === advocateId ? null : advocateId
     );
+  };
+
+  const handleSortChange = (newSortBy: "firstName" | "lastName" | "city") => {
+    setSortBy(newSortBy);
+    setCurrentPage(1);
+    fetchAdvocates(searchTerm, 1, false, newSortBy, sortOrder);
+  };
+
+  const handleSortOrderChange = (newSortOrder: "asc" | "desc") => {
+    setSortOrder(newSortOrder);
+    setCurrentPage(1);
+    fetchAdvocates(searchTerm, 1, false, sortBy, newSortOrder);
   };
 
   if (loading) {
@@ -208,6 +228,79 @@ export default function Home() {
             >
               Clear Search
             </button>
+          </div>
+
+          {/* Sorting Controls */}
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <div className="flex items-center space-x-2">
+                <label
+                  htmlFor="sort-by"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Sort by:
+                </label>
+                <select
+                  id="sort-by"
+                  value={sortBy}
+                  onChange={(e) =>
+                    handleSortChange(
+                      e.target.value as "firstName" | "lastName" | "city"
+                    )
+                  }
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors text-sm"
+                >
+                  <option value="lastName">Last Name</option>
+                  <option value="firstName">First Name</option>
+                  <option value="city">City</option>
+                </select>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <label
+                  htmlFor="sort-order"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Order:
+                </label>
+                <select
+                  id="sort-order"
+                  value={sortOrder}
+                  onChange={(e) =>
+                    handleSortOrderChange(e.target.value as "asc" | "desc")
+                  }
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors text-sm"
+                >
+                  <option value="asc">A to Z</option>
+                  <option value="desc">Z to A</option>
+                </select>
+              </div>
+
+              <div className="flex items-center space-x-1 text-sm text-gray-600">
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span>
+                  Currently sorting by{" "}
+                  {sortBy === "firstName"
+                    ? "First Name"
+                    : sortBy === "lastName"
+                    ? "Last Name"
+                    : "City"}{" "}
+                  ({sortOrder === "asc" ? "A to Z" : "Z to A"})
+                </span>
+              </div>
+            </div>
           </div>
 
           {searchTerm && (
