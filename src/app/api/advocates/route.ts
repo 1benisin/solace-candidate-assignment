@@ -5,7 +5,7 @@ import {
   type Advocate,
   type AdvocatesResponse,
 } from "../../../types/advocate";
-import { sql, desc, count, or, ilike } from "drizzle-orm";
+import { sql, desc, count, or, ilike, asc } from "drizzle-orm";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 
@@ -14,6 +14,8 @@ const queryParamsSchema = z.object({
   search: z.string().max(100).optional(), // Limit search query length
   page: z.number().int().positive().max(1000).default(1), // Reasonable page limits
   limit: z.number().int().positive().max(100).default(20), // Limit page size
+  sortBy: z.enum(["firstName", "lastName", "city"]),
+  sortOrder: z.enum(["asc", "desc"]),
 });
 
 export async function GET(request: NextRequest): Promise<Response> {
@@ -25,6 +27,8 @@ export async function GET(request: NextRequest): Promise<Response> {
       search: searchParams.get("search") || "",
       page: parseInt(searchParams.get("page") || "1"),
       limit: parseInt(searchParams.get("limit") || "20"),
+      sortBy: searchParams.get("sortBy") || "lastName", //first name, last name, or city
+      sortOrder: searchParams.get("sortOrder") || "asc", // asc, desc
     };
 
     const validation = queryParamsSchema.safeParse(rawParams);
@@ -35,7 +39,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       );
     }
 
-    const { search, page, limit } = validation.data;
+    const { search, page, limit, sortBy, sortOrder } = validation.data;
     const offset = (page - 1) * limit;
 
     // Check if we have a database connection
@@ -62,6 +66,9 @@ export async function GET(request: NextRequest): Promise<Response> {
         )
       : undefined;
 
+    const sortBySelection =
+      sortOrder === "asc" ? asc(advocates[sortBy]) : desc(advocates[sortBy]);
+
     // Single query with window function for count (more efficient)
     const query = db
       .select({
@@ -78,7 +85,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       })
       .from(advocates)
       .where(whereConditions)
-      .orderBy(desc(advocates.createdAt))
+      .orderBy(sortBySelection)
       .limit(limit)
       .offset(offset);
 
