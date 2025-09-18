@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Advocate, AdvocatesResponse, PaginationInfo } from "../types/advocate";
 import { formatPhoneNumber } from "../utils/phone";
 
@@ -19,6 +19,7 @@ export default function Home() {
     "lastName"
   );
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const isInitialLoad = useRef(true);
 
   const fetchAdvocates = useCallback(
     async (
@@ -66,8 +67,12 @@ export default function Home() {
     []
   );
 
+  // Initial load effect - only runs once
   useEffect(() => {
-    fetchAdvocates("", 1, true, sortBy, sortOrder);
+    if (isInitialLoad.current) {
+      fetchAdvocates("", 1, true, sortBy, sortOrder);
+      isInitialLoad.current = false;
+    }
   }, [fetchAdvocates, sortBy, sortOrder]);
 
   // Debounced search function
